@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./wait.css">
+    <title>Conversation</title>
+    <style>
+        
+    </style>
+    <link rel="stylesheet" href="./conversation.css">
+    <script type="module" src="./conversation.js"></script>
+    <script type="module">
+
+        function showLogin() {
+            const loginDiv = document.createElement("div");
+            loginDiv.classList.add("login-div");
+
+            const errorDiv = document.createElement("div");
+            loginDiv.appendChild(errorDiv);
+
+            const usernameInput = document.createElement("input");
+            loginDiv.appendChild(usernameInput);
+            const passwordInput = document.createElement("input");
+            passwordInput.type = "password";
+            loginDiv.appendChild(passwordInput);
+
+
+            const loginButton = document.createElement("button");
+            loginButton.innerText = "Login";
+            loginDiv.appendChild(loginButton);
+            document.body.appendChild(loginDiv);
+
+            loginButton.onclick = (event) => {
+                
+                const login = {
+                    username: usernameInput.value,
+                    password: passwordInput.value
+                };
+                
+                fetch(host + "/session/key", {method: "POST", headers: {"Content-type": "application/json"},body: JSON.stringify(login)}).then((resp) => {
+                    if (resp.ok) {
+                        return resp.text()
+                    } else {
+                        throw "Error";
+                    }
+                }).then((key) => {
+                    key = key.trim();
+                    if (key.length == 0) {
+                        throw "No key";
+                    }
+                    sessionKey = key;
+                    localStorage.setItem("sessionKey", key);
+
+                    refresh();
+
+                    loginDiv.remove();
+                }).catch((error) => {
+                    errorDiv.classList.add("error");
+                    errorDiv.innerText = error;
+                });
+            }
+        }
+
+        let conversationId = new URLSearchParams(location.search).get("conversation");
+        
+        const host = "http://localhost:8080";
+
+        let sessionKey = window.localStorage.getItem("sessionKey");
+
+        if (!sessionKey) {
+            showLogin();
+        } else {
+            document.body.onload = (event) => { 
+                refresh();
+            };
+        }
+
+        function refresh() {
+            const cf = document.getElementById("conversation-feed");
+            if (conversationId) {
+                cf.setAttribute("conversation-id", conversationId);
+            } else {
+                cf.removeAttribute("conversation-id");
+            }
+                cf.setAttribute("session-key", sessionKey);
+                cf.setAttribute("host", host);
+                cf.prepare();
+
+            fetch(host + "/conversations", {headers: {"Session-key": sessionKey}}).then((resp) => {
+                if (resp.ok) {
+                    return resp.json()
+                } else {
+                    throw "Error";
+                }
+            }).then((json) => {
+
+                const conversationsList = document.getElementById("conversations-list");
+                conversationsList.innerHTML = "";
+
+                for (const conversation of json) {
+                    const conversationItem = document.createElement("div");
+                    conversationItem.innerText = conversation;
+
+                    conversationItem.onclick = (event) => {
+                        cf.setAttribute("conversation-id", conversation);
+                        cf.prepare();
+
+                        const url = new URL(location.href);
+                        url.searchParams.set("conversation", conversation)
+
+                        window.history.pushState({}, "Change conversation", url);
+                    }
+
+                    conversationsList.appendChild(conversationItem);
+                }
+            });
+        }
+
+
+    </script>
+</head>
+<body>
+    <div id="conversations-list">
+
+    </div>
+    <conversation-feed id="conversation-feed">
+    </conversation-feed>
+</body>
+</html>
